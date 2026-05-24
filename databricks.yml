@@ -1,0 +1,25 @@
+bundle:
+  name: volvo-predictive-maintenance
+
+variables:
+  catalog:
+    default: volvo_poc
+  warehouse_id:
+    default: 5b1ca4f1d21b522a
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: https://dbc-a4654756-d754.cloud.databricks.com
+      root_path: /Workspace/Users/decarboniccodes@gmail.com/.bundle/${bundle.name}/${bundle.target}
+
+  prod:
+    mode: production
+    workspace:
+      host: https://dbc-a4654756-d754.cloud.databricks.com
+      root_path: /Workspace/Users/decarboniccodes@gmail.com/.bundle/${bundle.name}/${bundle.target}
+
+include:
+  - resources/jobs/*.yml

@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+.env
+
+# Data files (generated locally, not committed)
+data/raw/*.csv
+data/raw/*.parquet
+
+# MLflow
+mlruns/
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Databricks bundle state
+.databricks/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
