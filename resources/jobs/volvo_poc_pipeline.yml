@@ -2,91 +2,65 @@ resources:
   jobs:
     volvo_poc_pipeline:
       name: "[${bundle.target}] Volvo POC — Full Medallion Pipeline"
-      description: "End-to-end pipeline: data gen → bronze → silver → gold → ML → scoring"
+      description: "End-to-end pipeline: data gen → Unity Catalog → bronze → silver → gold → ML"
 
       tags:
         project: volvo-poc
         team: data-engineering
 
-      job_clusters:
-        - job_cluster_key: main_cluster
-          new_cluster:
-            spark_version: 15.4.x-scala2.12
-            node_type_id: Standard_DS3_v2
-            num_workers: 1
-            spark_conf:
-              spark.databricks.delta.preview.enabled: "true"
-
       tasks:
         - task_key: data_generation
-          description: "Generate 1M rows of synthetic bus telemetry"
+          description: "Generate 1M rows of synthetic bus telemetry into UC Volume"
           notebook_task:
-            notebook_path: /Workspace/Users/decarboniccodes@gmail.com/.bundle/volvo-predictive-maintenance/${bundle.target}/files/notebooks/00_data_generation
+            notebook_path: /Workspace/Users/decarboniccodes@gmail.com/volvo-predictive-maintenance/notebooks/00_data_generation
             base_parameters:
               catalog: ${var.catalog}
-          job_cluster_key: main_cluster
 
         - task_key: unity_catalog_setup
-          description: "Create catalog, schemas, masks, filters, grants"
+          description: "Create catalog, schemas, column masks, row filters, grants"
           depends_on:
             - task_key: data_generation
           notebook_task:
-            notebook_path: /Workspace/Users/decarboniccodes@gmail.com/.bundle/volvo-predictive-maintenance/${bundle.target}/files/notebooks/01_unity_catalog_setup
+            notebook_path: /Workspace/Users/decarboniccodes@gmail.com/volvo-predictive-maintenance/notebooks/01_unity_catalog_setup
             base_parameters:
               catalog: ${var.catalog}
-          job_cluster_key: main_cluster
 
         - task_key: bronze_ingestion
-          description: "Ingest raw CSVs into Delta bronze table"
+          description: "Ingest raw CSVs from UC Volume into Delta bronze table"
           depends_on:
             - task_key: unity_catalog_setup
           notebook_task:
-            notebook_path: /Workspace/Users/decarboniccodes@gmail.com/.bundle/volvo-predictive-maintenance/${bundle.target}/files/notebooks/02_bronze_ingestion
+            notebook_path: /Workspace/Users/decarboniccodes@gmail.com/volvo-predictive-maintenance/notebooks/02_bronze_ingestion
             base_parameters:
               catalog: ${var.catalog}
-          job_cluster_key: main_cluster
 
         - task_key: silver_curation
-          description: "Cleanse, validate, PII-mask, write silver"
+          description: "Cleanse, validate, PII-mask, write Silver layer"
           depends_on:
             - task_key: bronze_ingestion
           notebook_task:
-            notebook_path: /Workspace/Users/decarboniccodes@gmail.com/.bundle/volvo-predictive-maintenance/${bundle.target}/files/notebooks/03_silver_curation
+            notebook_path: /Workspace/Users/decarboniccodes@gmail.com/volvo-predictive-maintenance/notebooks/03_silver_curation
             base_parameters:
               catalog: ${var.catalog}
-          job_cluster_key: main_cluster
 
         - task_key: gold_features
-          description: "Rolling stats, wear indices, composite risk score"
+          description: "Feature engineering — wear indices, composite risk score"
           depends_on:
             - task_key: silver_curation
           notebook_task:
-            notebook_path: /Workspace/Users/decarboniccodes@gmail.com/.bundle/volvo-predictive-maintenance/${bundle.target}/files/notebooks/04_gold_features
+            notebook_path: /Workspace/Users/decarboniccodes@gmail.com/volvo-predictive-maintenance/notebooks/04_gold_features
             base_parameters:
               catalog: ${var.catalog}
-          job_cluster_key: main_cluster
 
         - task_key: ml_training
           description: "Train XGBoost, log to MLflow, register model"
           depends_on:
             - task_key: gold_features
           notebook_task:
-            notebook_path: /Workspace/Users/decarboniccodes@gmail.com/.bundle/volvo-predictive-maintenance/${bundle.target}/files/notebooks/05_ml_training
+            notebook_path: /Workspace/Users/decarboniccodes@gmail.com/volvo-predictive-maintenance/notebooks/05_ml_training
             base_parameters:
               catalog: ${var.catalog}
-              experiment_name: /volvo-poc/failure-predictor
-          job_cluster_key: main_cluster
-
-        - task_key: batch_scoring
-          description: "Score full fleet, write fleet_failure_scores"
-          depends_on:
-            - task_key: ml_training
-          notebook_task:
-            notebook_path: /Workspace/Users/decarboniccodes@gmail.com/.bundle/volvo-predictive-maintenance/${bundle.target}/files/notebooks/06_batch_scoring
-            base_parameters:
-              catalog: ${var.catalog}
-              failure_threshold: "0.65"
-          job_cluster_key: main_cluster
+              experiment_name: /Users/decarboniccodes@gmail.com/volvo-poc-failure-predictor
 
       email_notifications:
         on_failure:
