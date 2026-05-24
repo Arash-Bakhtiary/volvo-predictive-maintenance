@@ -2,7 +2,7 @@
 # MAGIC %md
 # MAGIC # Gold Layer — Feature Engineering
 # MAGIC Computes rolling statistics, wear indices, anomaly counts, and composite
-# MAGIC risk score from Silver. Writes volvo_poc.gold.bus_features.
+# MAGIC risk score from Silver. Writes all valid events to volvo_poc.gold.bus_features.
 
 # COMMAND ----------
 dbutils.widgets.text("catalog", "volvo_poc")
@@ -14,16 +14,9 @@ from pyspark.sql import functions as F, Window
 spark.sql(f"USE CATALOG {catalog}")
 
 df = spark.table(f"{catalog}.silver.bus_telemetry_curated").filter("is_valid_record = true")
+print(f"Silver valid rows: {df.count():,}")
 
-# ── Latest snapshot per bus (most recent reading) ─────────────────────────────
-w_bus = Window.partitionBy("bus_id").orderBy(F.col("event_timestamp").desc())
-df_latest = (df
-    .withColumn("_rn", F.row_number().over(w_bus))
-    .filter(F.col("_rn") == 1)
-    .drop("_rn")
-)
-
-# ── 7-day rolling window stats ─────────────────────────────────────────────────
+# ── 7-day and 30-day rolling window stats (all rows, not just latest) ──────────
 w7 = (Window.partitionBy("bus_id")
       .orderBy(F.unix_timestamp("event_timestamp"))
       .rangeBetween(-7 * 86400, 0))
@@ -44,15 +37,8 @@ df_windowed = (df
          F.sum(F.col("battery_anomaly").cast("int")).over(w30)))
 )
 
-# Take the latest windowed snapshot per bus
-df_feat = (df_windowed
-    .withColumn("_rn", F.row_number().over(w_bus))
-    .filter(F.col("_rn") == 1)
-    .drop("_rn")
-)
-
 # ── Derived features ───────────────────────────────────────────────────────────
-df_feat = (df_feat
+df_feat = (df_windowed
     .withColumn("brake_wear_index",  F.col("brake_wear_pct") / 100.0)
     .withColumn("composite_risk_score",
         F.least(F.lit(1.0),
@@ -81,7 +67,7 @@ feature_cols = [
 
 df_gold = df_feat.select(*feature_cols)
 
-# ── Write Gold table ───────────────────────────────────────────────────────────
+# ── Write Gold table (all events, partitioned by bus_model) ───────────────────
 (df_gold.write
     .format("delta")
     .mode("overwrite")

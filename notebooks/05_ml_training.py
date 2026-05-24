@@ -4,6 +4,9 @@
 # MAGIC Trains on gold.bus_features, logs to MLflow, registers model.
 
 # COMMAND ----------
+# MAGIC %pip install xgboost --quiet
+
+# COMMAND ----------
 dbutils.widgets.text("catalog", "volvo_poc")
 dbutils.widgets.text("experiment_name", "/volvo-poc/failure-predictor")
 catalog         = dbutils.widgets.get("catalog")
